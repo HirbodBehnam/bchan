@@ -1,4 +1,4 @@
-module bchan
+module github.com/HirbodBehnam/bchan
 
 go 1.18
 
