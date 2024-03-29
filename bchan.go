@@ -13,7 +13,7 @@ type BroadcastChannel[T any] struct {
 	// The key is the channel which user can read from to get the broadcast messages.
 	// The value is a dummy channel which closes just before the sender channel is closed.
 	// The reason that we do this, is that we could skip the closed channels while iterating.
-	registeredChannels map[UnsubscribeToken]chan T
+	registeredChannels map[UnsubscribeToken]chan<- T
 	// A mutex to lock the map
 	mu sync.RWMutex
 }
@@ -21,13 +21,13 @@ type BroadcastChannel[T any] struct {
 // NewBroadcastChannel will create a new BroadcastChannel
 func NewBroadcastChannel[T any]() *BroadcastChannel[T] {
 	return &BroadcastChannel[T]{
-		registeredChannels: map[UnsubscribeToken]chan T{},
+		registeredChannels: map[UnsubscribeToken]chan<- T{},
 	}
 }
 
 // Subscribe to this broadcast channel to get the updates.
-// Gets a buffer size to create buffered channels
-func (bchan *BroadcastChannel[T]) Subscribe(buffer int) (chan T, UnsubscribeToken) {
+// Buffer size is the buffer size of the receive channel.
+func (bchan *BroadcastChannel[T]) Subscribe(buffer int) (<-chan T, UnsubscribeToken) {
 	c := make(chan T, buffer)
 	cancelChan := make(chan struct{})
 	bchan.mu.Lock()
@@ -63,7 +63,7 @@ func (bchan *BroadcastChannel[T]) Broadcast(data T) {
 }
 
 // TryBroadcast will try to send a data in all subscribed channels.
-// It will skip the channels which are not ready to receive data.
+// It will skip the channels which are not ready to receive data (non blocking send).
 func (bchan *BroadcastChannel[T]) TryBroadcast(data T) {
 	bchan.mu.RLock()
 	for canceled, c := range bchan.registeredChannels {

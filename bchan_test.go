@@ -2,7 +2,9 @@ package bchan
 
 import (
 	"github.com/stretchr/testify/assert"
+	"fmt"
 	"math/rand"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -135,6 +137,39 @@ func TestBroadcast3(t *testing.T) {
 	wg.Wait()
 }
 
+func TestBroadcast4(t *testing.T) {
+	// Randomly sub, don't do anything, then unsub
+	const Threads = 8
+	const DataCount = 100_000
+	bchan := NewBroadcastChannel[int]()
+	doneChannel := make(chan struct{})
+	wg := new(sync.WaitGroup)
+	wg.Add(Threads)
+	for i := 0; i < Threads; i++ {
+		go func() {
+			for {
+				_, unsubToken := bchan.Subscribe(0)
+				select {
+				case <-doneChannel: // we are done
+					wg.Done()
+					return
+				default:
+					// do nothing
+				}
+				runtime.Gosched()
+				bchan.Unsubscribe(unsubToken)
+			}
+		}()
+	}
+	// Send data
+	for data := 0; data < DataCount; data++ {
+		bchan.Broadcast(data)
+	}
+	close(doneChannel)
+	// Wait for them to be received
+	wg.Wait()
+}
+
 func TestTryBroadcast1(t *testing.T) {
 	const Threads = 8
 	const DataCount = 1000
@@ -226,5 +261,64 @@ func TestTryBroadcast3(t *testing.T) {
 		bchan.TryBroadcast(data)
 	}
 	// Wait for them to be received
+	wg.Wait()
+}
+
+func TestTryBroadcast4(t *testing.T) {
+	// Randomly sub, don't do anything, then unsub
+	const Threads = 8
+	const DataCount = 100_000
+	bchan := NewBroadcastChannel[int]()
+	doneChannel := make(chan struct{})
+	wg := new(sync.WaitGroup)
+	wg.Add(Threads)
+	for i := 0; i < Threads; i++ {
+		go func() {
+			for {
+				_, unsubToken := bchan.Subscribe(0)
+				select {
+				case <-doneChannel: // we are done
+					wg.Done()
+					return
+				default:
+					// do nothing
+				}
+				runtime.Gosched()
+				bchan.Unsubscribe(unsubToken)
+			}
+		}()
+	}
+	// Send data
+	for data := 0; data < DataCount; data++ {
+		bchan.TryBroadcast(data)
+	}
+	close(doneChannel)
+	// Wait for them to be received
+	wg.Wait()
+}
+
+func Example1() {
+	// Create the broadcast channel
+	bchan := NewBroadcastChannel[int]()
+	wg := new(sync.WaitGroup)
+	wg.Add(4)
+	// In 4 threads receive the data
+	for threadID := 0; threadID < 4; threadID++ {
+	    // Subscribe to the broadcast channel
+		sub, unsubToken := bchan.Subscribe(0)
+		go func(threadID int) {
+			for i := 0; i < 5; i++ {
+				fmt.Printf("Thread %d received %d\n", threadID, <-sub)
+			}
+	        // Unsubscribe when we are done
+			bchan.Unsubscribe(unsubToken)
+			wg.Done()
+		}(threadID)
+	}
+	// Send data to threads
+	for data := 0; data < 5; data++ {
+		bchan.Broadcast(data)
+	}
+	// Wait threads to finish
 	wg.Wait()
 }
