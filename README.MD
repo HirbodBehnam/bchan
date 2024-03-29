@@ -37,13 +37,13 @@ wg := new(sync.WaitGroup)
 wg.Add(4)
 // In 4 threads receive the data
 for threadID := 0; threadID < 4; threadID++ {
-    // Subscribe to the broadcast channel
+	// Subscribe to the broadcast channel
 	sub, unsubToken := bchan.Subscribe(0)
 	go func(threadID int) {
 		for i := 0; i < 5; i++ {
 			fmt.Printf("Thread %d received %d\n", threadID, <-sub)
 		}
-        // Unsubscribe when we are done
+		// Unsubscribe when we are done
 		bchan.Unsubscribe(unsubToken)
 		wg.Done()
 	}(threadID)
